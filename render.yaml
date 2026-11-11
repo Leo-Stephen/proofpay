@@ -15,7 +15,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.5-flash-lite
       - key: BASE_URL
         sync: false   # set to your Render service URL, e.g. https://proofpay.onrender.com
       - key: MOCK_AI

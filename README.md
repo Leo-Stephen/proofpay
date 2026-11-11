@@ -122,7 +122,7 @@ This creates 3 milestones with pre-verified proofs (pass / fail / unclear) visib
 | `PAYPAL_SECRET` | For real payments | — | PayPal sandbox/live app secret |
 | `PAYPAL_BASE` | No | `https://api-m.sandbox.paypal.com` | PayPal API base URL |
 | `GEMINI_API_KEY` | For real AI | — | Google Gemini API key |
-| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Gemini model name |
+| `GEMINI_MODEL` | No | `gemini-3.5-flash-lite` | Gemini model name |
 | `BASE_URL` | No | `http://localhost:8000` | Your app's public URL (for PayPal redirect URLs) |
 | `MOCK_AI` | No | `0` | Set to `1` for deterministic mock AI (no Gemini call) |
 | `DB_PATH` | No | `proofpay.db` | SQLite file path |

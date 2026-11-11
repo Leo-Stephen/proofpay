@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 MOCK_AI = os.getenv("MOCK_AI", "0") == "1"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 VerifyResult = dict  # typed alias for clarity
@@ -105,10 +105,12 @@ Evaluation rules:
 1. Split the criteria into individual checkable items.
 2. For each item, assess whether the proof provides concrete, verifiable \
    evidence that it is met.
-3. verdict = "pass" only if EVERY criterion is clearly met with concrete evidence.
-4. verdict = "fail" if ANY criterion is clearly NOT met.
-5. verdict = "unclear" if evidence is missing, ambiguous, or confidence < 0.7.
-6. Set confidence between 0.0 and 1.0.
+3. verdict = "pass" only if EVERY item is met with concrete evidence from the proof.
+4. verdict = "fail" if any item is clearly unmet, contradictory, or proven failed \
+   (e.g., claimant admits failure or deliverable violates requirements).
+5. verdict = "unclear" if evidence is missing, partial, ambiguous, or cannot be verified.
+6. Set confidence between 0.0 and 1.0. If confidence < 0.7 or evidence is inconclusive, \
+   verdict MUST be "unclear".
 7. For agent_spend template: criteria are the owner's spending policy; \
    proof is the agent's purchase request (vendor, amount, reason). \
    Judge whether the request complies with the policy.
@@ -165,28 +167,36 @@ Evaluate the proof against the criteria. Respond only with valid JSON.
             "responseMimeType": "application/json",
             "responseSchema": _RESPONSE_SCHEMA,
             "temperature": 0.1,
-            "maxOutputTokens": 1024,
+            "maxOutputTokens": 4096,
         },
     }
 
-    url = f"{GEMINI_BASE}/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    models_to_try = [GEMINI_MODEL]
+    fallback_model = "gemini-3.5-flash" if GEMINI_MODEL == "gemini-3.5-flash-lite" else "gemini-3.5-flash-lite"
+    if fallback_model not in models_to_try:
+        models_to_try.append(fallback_model)
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(url, json=payload)
+    last_error = None
+    for model in models_to_try:
+        url = f"{GEMINI_BASE}/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            async with httpx.AsyncClient(timeout=45) as client:
+                resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw_json = data["candidates"][0]["content"]["parts"][0]["text"]
+                result = json.loads(raw_json)
+                result["mock"] = False
+                _clamp_result(result)
+                return result
+            else:
+                last_error = f"Gemini API error ({model}) {resp.status_code}: {resp.text[:300]}"
+                logger.warning(last_error)
+        except Exception as exc:
+            last_error = f"Gemini request exception ({model}): {exc}"
+            logger.warning(last_error)
 
-    if resp.status_code != 200:
-        raise RuntimeError(f"Gemini API error {resp.status_code}: {resp.text[:400]}")
-
-    data = resp.json()
-    try:
-        raw_json = data["candidates"][0]["content"]["parts"][0]["text"]
-        result = json.loads(raw_json)
-    except (KeyError, IndexError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Could not parse Gemini response: {exc}") from exc
-
-    result["mock"] = False
-    _clamp_result(result)
-    return result
+    raise RuntimeError(last_error or "All Gemini models failed")
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +271,7 @@ def _split_criteria(criteria: str) -> list[str]:
 
 
 def _clamp_result(result: dict) -> None:
-    """Ensure confidence is in [0, 1] and verdict is valid."""
+    """Ensure confidence is in [0, 1] and verdict is valid per SPEC rules."""
     result["confidence"] = max(0.0, min(1.0, float(result.get("confidence", 0.5))))
-    if result.get("verdict") not in ("pass", "fail", "unclear"):
+    if result["confidence"] < 0.7 or result.get("verdict") not in ("pass", "fail", "unclear"):
         result["verdict"] = "unclear"
