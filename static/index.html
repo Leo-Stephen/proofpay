@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ProofPay — Conditional Payments Verified by AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* =========================================================
+   DESIGN TOKENS
+========================================================= */
+:root {
+  --ink:        #0F172A;
+  --muted:      #64748B;
+  --bg:         #F8FAFC;
+  --surface:    #FFFFFF;
+  --border:     #E5E7EB;
+  --primary:    #4F46E5;
+  --primary-h:  #3730A3;
+  --primary-bg: #EEF2FF;
+
+  /* Status colours */
+  --s-pending:  #64748B;
+  --s-held:     #D97706;
+  --s-released: #059669;
+  --s-voided:   #DC2626;
+  --s-review:   #7C3AED;
+
+  /* Semantic */
+  --radius:     16px;
+  --radius-sm:  8px;
+  --shadow:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --font:       'Inter', system-ui, -apple-system, sans-serif;
+  --transition: 180ms cubic-bezier(.4,0,.2,1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink:        #F1F5F9;
+    --muted:      #94A3B8;
+    --bg:         #0F172A;
+    --surface:    #1E293B;
+    --border:     #334155;
+    --primary-bg: #1E1B4B;
+  }
+}
+
+/* =========================================================
+   RESET & BASE
+========================================================= */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+input, textarea, select { font-family: inherit; }
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 0;
+}
+
+/* =========================================================
+   LAYOUT
+========================================================= */
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 24px;
+  height: 56px;
+  display: flex; align-items: center; gap: 12px;
+}
+.logo {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 1.125rem; color: var(--ink);
+}
+.logo-icon {
+  width: 32px; height: 32px;
+  background: var(--primary);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-tagline {
+  font-size: .75rem; color: var(--muted); font-weight: 400;
+  border-left: 1px solid var(--border); padding-left: 12px; margin-left: 4px;
+}
+.header-spacer { flex: 1; }
+.mock-badge {
+  background: #FEF3C7; color: #92400E;
+  font-size: .6875rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid #FDE68A;
+}
+
+.app-main {
+  max-width: 1080px; margin: 0 auto;
+  padding: 32px 24px;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .app-main { grid-template-columns: 1fr; padding: 16px; }
+}
+
+.ledger-section { max-width: 1080px; margin: 0 auto; padding: 0 24px 48px; }
+@media (max-width: 768px) { .ledger-section { padding: 0 16px 32px; } }
+
+/* =========================================================
+   CARD
+========================================================= */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card-header {
+  padding: 20px 24px 0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.card-title { font-weight: 600; font-size: .9375rem; }
+.card-body { padding: 16px 24px 24px; }
+.card-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+/* =========================================================
+   FORM ELEMENTS
+========================================================= */
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: .8125rem; font-weight: 500; color: var(--ink); }
+.field-hint { font-size: .75rem; color: var(--muted); }
+.input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: .875rem;
+  color: var(--ink);
+  width: 100%;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+  outline: none;
+}
+.input::placeholder { color: var(--muted); }
+textarea.input { resize: vertical; min-height: 80px; }
+
+/* Amount row */
+.amount-row { display: grid; grid-template-columns: 1fr 72px; gap: 8px; }
+
+/* Template toggle */
+.template-toggle {
+  display: flex; gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+.toggle-btn {
+  flex: 1; padding: 6px 10px;
+  font-size: .8125rem; font-weight: 500;
+  border-radius: 6px;
+  background: transparent; color: var(--muted);
+  transition: background var(--transition), color var(--transition);
+}
+.toggle-btn.active {
+  background: var(--surface); color: var(--primary);
+  box-shadow: var(--shadow);
+}
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: .875rem; font-weight: 500;
+  transition: background var(--transition), opacity var(--transition), transform var(--transition);
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+
+.btn-ghost {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--bg); color: var(--ink); }
+
+.btn-success { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+.btn-success:hover:not(:disabled) { background: #D1FAE5; }
+
+.btn-danger { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+.btn-danger:hover:not(:disabled) { background: #FEE2E2; }
+
+.btn-sm { padding: 5px 12px; font-size: .8125rem; }
+.btn-full { width: 100%; }
+
+/* =========================================================
+   STATUS BADGES
+========================================================= */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 10px; border-radius: 999px;
+  font-size: .75rem; font-weight: 600;
+  letter-spacing: .01em;
+}
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.badge-PENDING_FUNDING { background: #F1F5F9; color: var(--s-pending); }
+.badge-PENDING_FUNDING .badge-dot { background: var(--s-pending); }
+.badge-HELD { background: #FFFBEB; color: var(--s-held); }
+.badge-HELD .badge-dot { background: var(--s-held); }
+.badge-RELEASED { background: #ECFDF5; color: var(--s-released); }
+.badge-RELEASED .badge-dot { background: var(--s-released); }
+.badge-VOIDED { background: #FEF2F2; color: var(--s-voided); }
+.badge-VOIDED .badge-dot { background: var(--s-voided); }
+.badge-NEEDS_REVIEW { background: #F5F3FF; color: var(--s-review); }
+.badge-NEEDS_REVIEW .badge-dot { background: var(--s-review); }
+
+/* Verdict badges */
+.verdict-pass { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: .875rem; padding: 4px 14px; }
+.verdict-fail { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: .875rem; padding: 4px 14px; }
+.verdict-unclear { background: #F5F3FF; color: #5B21B6; border: 1px solid #DDD6FE; font-size: .875rem; padding: 4px 14px; }
+
+/* =========================================================
+   LIFECYCLE STEPPER
+========================================================= */
+.stepper {
+  display: flex; align-items: center;
+  padding: 20px 24px;
+  gap: 0;
+  overflow-x: auto;
+}
+.step {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; flex: 1;
+  position: relative;
+}
+.step-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .6875rem; font-weight: 600;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  transition: all var(--transition);
+  position: relative; z-index: 1;
+}
+.step-label {
+  font-size: .6875rem; font-weight: 500; color: var(--muted);
+  text-align: center; white-space: nowrap;
+  transition: color var(--transition);
+}
+.step-connector {
+  flex: 1; height: 2px;
+  background: var(--border);
+  margin-top: -20px;  /* align with circle center */
+  transition: background var(--transition);
+  min-width: 16px;
+}
+
+.step.done .step-circle {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.step.done .step-label { color: var(--primary); }
+.step.active .step-circle {
+  border-color: var(--primary); color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(79,70,229,.15);
+}
+.step.active .step-label { color: var(--ink); font-weight: 600; }
+.step-connector.done { background: var(--primary); }
+
+/* =========================================================
+   AI VERDICT CARD
+========================================================= */
+.verdict-card { padding: 20px 24px; }
+.verdict-header {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+.verdict-title { font-weight: 600; font-size: 1rem; }
+.mock-label {
+  font-size: .6875rem; font-weight: 600;
+  background: #FEF3C7; color: #92400E;
+  border: 1px solid #FDE68A;
+  padding: 1px 8px; border-radius: 999px;
+}
+
+.confidence-bar-wrap { margin-bottom: 20px; }
+.confidence-label {
+  display: flex; justify-content: space-between;
+  font-size: .75rem; color: var(--muted); margin-bottom: 6px;
+}
+.confidence-bar-track {
+  height: 6px; background: var(--border); border-radius: 999px; overflow: hidden;
+}
+.confidence-bar-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), #818CF8);
+  transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+
+.reasons-list {
+  list-style: none; display: flex; flex-direction: column; gap: 6px;
+  margin-bottom: 16px;
+}
+.reasons-list li {
+  font-size: .8125rem; color: var(--muted); display: flex; align-items: start; gap: 8px;
+}
+
+.criteria-list { display: flex; flex-direction: column; gap: 8px; }
+.criterion-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex; gap: 10px; align-items: start;
+}
+.criterion-icon { flex-shrink: 0; margin-top: 1px; }
+.criterion-text { flex: 1; }
+.criterion-name { font-size: .8125rem; font-weight: 500; margin-bottom: 2px; }
+.criterion-evidence { font-size: .75rem; color: var(--muted); }
+
+/* =========================================================
+   DECIDE ACTIONS (NEEDS_REVIEW)
+========================================================= */
+.decide-section {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+}
+.decide-title {
+  font-size: .8125rem; font-weight: 600; margin-bottom: 12px; color: var(--ink);
+}
+.decide-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* =========================================================
+   PROOF FORM
+========================================================= */
+.proof-section { padding: 16px 24px 20px; border-top: 1px solid var(--border); }
+.proof-title { font-size: .8125rem; font-weight: 600; margin-bottom: 12px; color: var(--ink); }
+.file-drop {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  position: relative;
+}
+.file-drop:hover, .file-drop.drag { border-color: var(--primary); background: var(--primary-bg); }
+.file-drop input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+.file-drop-label { font-size: .8125rem; color: var(--muted); pointer-events: none; }
+.file-name { font-size: .8125rem; color: var(--primary); font-weight: 500; }
+
+/* =========================================================
+   LEDGER TABLE
+========================================================= */
+.ledger-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ledger-title { font-weight: 600; font-size: 1rem; }
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+table { width: 100%; border-collapse: collapse; }
+thead { background: var(--bg); }
+th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: .75rem; font-weight: 600; color: var(--muted);
+  letter-spacing: .04em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 12px 16px;
+  font-size: .875rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+tbody tr { cursor: pointer; transition: background var(--transition); }
+.td-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+.td-id { font-family: monospace; font-size: .75rem; color: var(--muted); }
+.td-date { font-size: .75rem; color: var(--muted); white-space: nowrap; }
+
+/* =========================================================
+   EMPTY / LOADING STATES
+========================================================= */
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty-icon { color: var(--muted); opacity: .4; }
+.empty-title { font-weight: 600; color: var(--ink); }
+.empty-desc { font-size: .875rem; color: var(--muted); max-width: 280px; }
+
+.spinner {
+  width: 20px; height: 20px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-state {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 32px; color: var(--muted); font-size: .875rem;
+}
+
+/* =========================================================
+   TOAST
+========================================================= */
+#toast-container {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  z-index: 999; pointer-events: none; width: min(480px, calc(100vw - 32px));
+}
+.toast {
+  background: var(--ink); color: #fff;
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  font-size: .875rem;
+  display: flex; align-items: start; gap: 10px;
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+  animation: slideUp .2s ease;
+  width: 100%;
+  word-break: break-word;
+}
+.toast-error { background: #991B1B; }
+.toast-success { background: #065F46; }
+.toast-close {
+  background: none; border: none; color: rgba(255,255,255,.7);
+  font-size: 1rem; cursor: pointer; flex-shrink: 0; padding: 0; line-height: 1;
+}
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { opacity: 1; } }
+
+/* =========================================================
+   DETAIL PLACEHOLDER
+========================================================= */
+.detail-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; min-height: 320px; padding: 32px;
+  color: var(--muted); text-align: center;
+}
+.detail-placeholder svg { opacity: .3; }
+
+/* PayPal approve banner */
+.approve-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-sm);
+  font-size: .875rem; color: #92400E;
+  margin-bottom: 16px;
+}
+
+/* =========================================================
+   MISC
+========================================================= */
+.form-gap { display: flex; flex-direction: column; gap: 12px; }
+.section-label {
+  font-size: .6875rem; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.inline-link { color: var(--primary); font-weight: 500; }
+.text-muted { color: var(--muted); }
+.text-sm { font-size: .875rem; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.flex-row { display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header class="app-header" role="banner">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon" aria-hidden="true">
+        <!-- Shield + checkmark icon -->
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+          <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z" fill="white" opacity=".9"/>
+          <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      ProofPay
+    </div>
+    <span class="logo-tagline" aria-label="Tagline">Money released only when AI verifies the work</span>
+    <div class="header-spacer"></div>
+    <span id="mock-badge" class="mock-badge" style="display:none">🤖 Demo mode</span>
+  </div>
+</header>
+
+<!-- ===================== MAIN GRID ===================== -->
+<main class="app-main" aria-label="Main content">
+
+  <!-- LEFT COLUMN: Create milestone -->
+  <section aria-label="Create milestone">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">New Milestone</h2>
+      </div>
+      <div class="card-body">
+
+        <!-- Template toggle -->
+        <div class="field" style="margin-bottom:16px">
+          <label id="template-label" class="section-label">Template</label>
+          <div class="template-toggle" role="group" aria-labelledby="template-label">
+            <button class="toggle-btn active" id="tmpl-freelance" onclick="setTemplate('freelance')" aria-pressed="true">
+              Freelance milestone
+            </button>
+            <button class="toggle-btn" id="tmpl-agent" onclick="setTemplate('agent_spend')" aria-pressed="false">
+              Agent spend
+            </button>
+          </div>
+        </div>
+
+        <form id="create-form" class="form-gap" onsubmit="handleCreate(event)" novalidate>
+          <div class="field">
+            <label for="f-title">Milestone title <span aria-hidden="true" style="color:#DC2626">*</span></label>
+            <input class="input" id="f-title" type="text" placeholder="e.g. Homepage redesign v2" required maxlength="200" />
+          </div>
+
+          <div class="field">
+            <div class="amount-row">
+              <div class="field">
+                <label for="f-amount">Amount <span aria-hidden="true" style="color:#DC2626">*</span></label>
+                <input class="input" id="f-amount" type="number" placeholder="500.00" min="0.01" max="100000" step="0.01" required />
+              </div>
+              <div class="field">
+                <label for="f-currency">Currency</label>
+                <select class="input" id="f-currency">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f-criteria">Criteria <span aria-hidden="true" style="color:#DC2626">*</span></label>
+            <textarea class="input" id="f-criteria" rows="4" placeholder="List each requirement on a new line or separated by semicolons. AI will check each one." required maxlength="5000"></textarea>
+            <span class="field-hint" id="criteria-hint">Each criterion will be individually evaluated by AI.</span>
+          </div>
+
+          <button class="btn btn-primary btn-full" type="submit" id="create-btn">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+            Create &amp; Fund with PayPal
+          </button>
+        </form>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT COLUMN: Milestone detail -->
+  <section aria-label="Milestone detail" aria-live="polite">
+    <div class="card" id="detail-card">
+      <div class="detail-placeholder" id="detail-placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <p class="empty-title">No milestone selected</p>
+        <p class="empty-desc">Create a milestone or click a row in the ledger below to view details.</p>
+      </div>
+      <div id="detail-content" style="display:none"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===================== LEDGER ===================== -->
+<section class="ledger-section" aria-label="Milestones ledger">
+  <div class="ledger-header">
+    <h2 class="ledger-title">All Milestones</h2>
+    <button class="btn btn-ghost btn-sm" onclick="loadLedger()" aria-label="Refresh ledger">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 12a8 8 0 018-8 8 8 0 015.66 2.34L20 4v6h-6l2.34-2.34A6 6 0 1018 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+  <div class="table-wrap">
+    <div id="ledger-loading" class="loading-state">
+      <div class="spinner"></div> Loading milestones…
+    </div>
+    <div id="ledger-empty" class="empty-state" style="display:none">
+      <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <p class="empty-title">No milestones yet</p>
+      <p class="empty-desc">Create your first milestone above to get started.</p>
+    </div>
+    <table id="ledger-table" style="display:none" role="grid">
+      <thead>
+        <tr>
+          <th scope="col">Title</th>
+          <th scope="col">Amount</th>
+          <th scope="col">Status</th>
+          <th scope="col">Template</th>
+          <th scope="col">Created</th>
+          <th scope="col">ID</th>
+        </tr>
+      </thead>
+      <tbody id="ledger-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== TOAST CONTAINER ===================== -->
+<div id="toast-container" aria-live="assertive" aria-atomic="false"></div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script>
+// =========================================================
+// STATE
+// =========================================================
+let selectedId = null;
+let mockAIEnabled = false;
+
+const TEMPLATES = {
+  freelance: {
+    title: 'Homepage redesign v2',
+    amount: '750.00',
+    criteria: `Deliver Figma source file with all components
+Final HTML/CSS matches approved mockup pixel-perfectly
+All pages pass WCAG 2.1 AA accessibility check
+Lighthouse performance score ≥ 90 on mobile
+No placeholder copy or images remain`,
+  },
+  agent_spend: {
+    title: 'Agent purchase approval',
+    amount: '250.00',
+    criteria: `Vendor must be on the approved vendor list
+Purchase amount must not exceed $300 per transaction
+Reason must clearly relate to the current project sprint
+No subscription services without prior written approval`,
+  },
+};
+
+const DEMO_PROOFS = {
+  pass: {
+    text: `All deliverables are completed and submitted.
+    
+Figma source file delivered with full component library. The HTML/CSS has been implemented and matches the approved mockup. WCAG 2.1 AA check passed — axe DevTools shows zero violations. Lighthouse mobile score: 94 (confirmed via screenshot attached). All copy is finalized; no placeholder text remains in the codebase.
+
+Receipt: Invoice #INV-2024-089 attached. Delivery confirmed on 2024-11-10.`,
+    link: 'https://github.com/example/homepage-v2',
+  },
+  fail: {
+    text: `Incomplete submission — the work is not done.
+
+The Figma file was never delivered. The HTML implementation is broken on mobile and has not been fixed. Accessibility check was not run — multiple WCAG violations remain. Lighthouse score is 54, well below the required 90. Several placeholder images and "Lorem ipsum" copy are still present in the codebase.
+
+This work is rejected and incomplete.`,
+    link: '',
+  },
+  unclear: {
+    text: `Some work has been done on the homepage redesign. I believe most things are finished but I haven't had time to run all the checks yet. The Figma file should be somewhere in the shared drive. Let me know if you need anything else.`,
+    link: '',
+  },
+};
+
+// =========================================================
+// UTILS
+// =========================================================
+function $(id) { return document.getElementById(id); }
+
+function fmtAmount(amount, currency) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+function statusLabel(s) {
+  const map = {
+    PENDING_FUNDING: 'Pending funding',
+    HELD: 'Held by PayPal',
+    RELEASED: 'Released',
+    VOIDED: 'Refunded',
+    NEEDS_REVIEW: 'Needs review',
+  };
+  return map[s] || s;
+}
+
+function badgeHtml(status) {
+  return `<span class="badge badge-${status}" role="status" aria-label="Status: ${statusLabel(status)}">
+    <span class="badge-dot" aria-hidden="true"></span>${statusLabel(status)}
+  </span>`;
+}
+
+// =========================================================
+// TOAST
+// =========================================================
+function toast(msg, type = 'info', duration = 5000) {
+  const c = $('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type === 'error' ? 'toast-error' : type === 'success' ? 'toast-success' : ''}`;
+  el.setAttribute('role', 'alert');
+  el.innerHTML = `
+    <span style="flex:1">${escapeHtml(msg)}</span>
+    <button class="toast-close" aria-label="Dismiss notification" onclick="this.closest('.toast').remove()">✕</button>
+  `;
+  c.appendChild(el);
+  if (duration > 0) setTimeout(() => el.remove(), duration);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// =========================================================
+// API helpers
+// =========================================================
+async function api(method, path, body, isForm = false) {
+  const opts = { method, headers: {} };
+  if (body && !isForm) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  } else if (body && isForm) {
+    opts.body = body; // FormData
+  }
+  const resp = await fetch('/api' + path, opts);
+  if (!resp.ok) {
+    let detail = `HTTP ${resp.status}`;
+    try {
+      const e = await resp.json();
+      detail = e.detail || e.message || JSON.stringify(e);
+    } catch {}
+    throw new Error(detail);
+  }
+  return resp.json();
+}
+
+// =========================================================
+// TEMPLATE TOGGLE
+// =========================================================
+function setTemplate(tmpl) {
+  document.querySelectorAll('.toggle-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+  $('tmpl-' + (tmpl === 'agent_spend' ? 'agent' : 'freelance')).classList.add('active');
+  $('tmpl-' + (tmpl === 'agent_spend' ? 'agent' : 'freelance')).setAttribute('aria-pressed', 'true');
+
+  const t = TEMPLATES[tmpl];
+  if (t) {
+    $('f-title').value = t.title;
+    $('f-amount').value = t.amount;
+    $('f-criteria').value = t.criteria;
+  }
+
+  const hint = tmpl === 'agent_spend'
+    ? 'Criteria are spending policy rules. Proof is an agent purchase request.'
+    : 'Each criterion will be individually evaluated by AI.';
+  $('criteria-hint').textContent = hint;
+
+  // Store current template
+  $('create-form').dataset.template = tmpl;
+}
+
+// Init
+setTemplate('freelance');
+
+// =========================================================
+// CREATE MILESTONE
+// =========================================================
+async function handleCreate(e) {
+  e.preventDefault();
+  const btn = $('create-btn');
+
+  const title = $('f-title').value.trim();
+  const amount = parseFloat($('f-amount').value);
+  const currency = $('f-currency').value;
+  const criteria = $('f-criteria').value.trim();
+  const template = $('create-form').dataset.template || 'freelance';
+
+  if (!title) { toast('Title is required.', 'error'); $('f-title').focus(); return; }
+  if (!amount || amount <= 0) { toast('Enter a valid amount.', 'error'); $('f-amount').focus(); return; }
+  if (!criteria) { toast('Criteria are required.', 'error'); $('f-criteria').focus(); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner"></div> Creating…`;
+
+  try {
+    const m = await api('POST', '/milestones', { title, amount, currency, criteria, template });
+
+    if (m._warning) {
+      toast(m._warning, 'info', 10000);
+    }
+
+    // Open PayPal in a popup / new tab
+    if (m.approve_url) {
+      const popup = window.open(m.approve_url, 'paypal_auth', 'width=600,height=700,noopener');
+      if (!popup || popup.closed) {
+        // Popup blocked — show approve link
+        toast(`PopUp blocked. <a href="${m.approve_url}" target="_blank" class="inline-link" style="color:#fff;text-decoration:underline">Click here to approve on PayPal</a>`, 'info', 0);
+      } else {
+        toast('PayPal opened in a new window. Complete funding there, then return here.', 'info', 8000);
+      }
+    }
+
+    await loadLedger();
+    selectMilestone(m.id);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </svg> Create &amp; Fund with PayPal`;
+  }
+}
+
+// =========================================================
+// AUTO-AUTHORIZE on PayPal return  (?funded=ID&token=ORDER_ID)
+// =========================================================
+(async function handlePayPalReturn() {
+  const params = new URLSearchParams(location.search);
+  const milestoneId = params.get('funded');
+  const token = params.get('token');
+  const cancelled = params.get('cancel');
+
+  if (cancelled) {
+    history.replaceState({}, '', '/');
+    toast(`Payment cancelled for milestone ${cancelled}.`, 'error');
+    return;
+  }
+
+  if (!milestoneId || !token) return;
+
+  // Clean URL immediately
+  history.replaceState({}, '', '/');
+
+  toast('PayPal approved — authorizing payment…', 'info', 4000);
+  try {
+    const result = await api('POST', `/milestones/${milestoneId}/authorize`, { token });
+    toast(`Payment held by PayPal (${result.authorization_id}). Now submit proof to release funds.`, 'success', 8000);
+    await loadLedger();
+    selectMilestone(milestoneId);
+  } catch (err) {
+    toast(`Authorization failed: ${err.message}`, 'error');
+  }
+})();
+
+// =========================================================
+// LEDGER
+// =========================================================
+async function loadLedger() {
+  $('ledger-loading').style.display = 'flex';
+  $('ledger-empty').style.display = 'none';
+  $('ledger-table').style.display = 'none';
+
+  try {
+    const milestones = await api('GET', '/milestones');
+    renderLedger(milestones);
+  } catch (err) {
+    $('ledger-loading').style.display = 'none';
+    $('ledger-loading').innerHTML = `<span style="color:#DC2626">Failed to load milestones: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+function renderLedger(milestones) {
+  $('ledger-loading').style.display = 'none';
+
+  if (!milestones.length) {
+    $('ledger-empty').style.display = 'flex';
+    return;
+  }
+
+  $('ledger-table').style.display = 'table';
+  const tbody = $('ledger-tbody');
+  tbody.innerHTML = '';
+
+  milestones.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.setAttribute('tabindex', '0');
+    tr.setAttribute('role', 'row');
+    tr.setAttribute('aria-label', `Milestone: ${m.title}`);
+    if (m.id === selectedId) tr.style.background = 'var(--primary-bg)';
+    tr.innerHTML = `
+      <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(m.title)}">${escapeHtml(m.title)}</td>
+      <td class="td-amount">${fmtAmount(m.amount, m.currency)}</td>
+      <td>${badgeHtml(m.status)}</td>
+      <td class="text-muted text-sm">${m.template === 'agent_spend' ? 'Agent spend' : 'Freelance'}</td>
+      <td class="td-date">${fmtDate(m.created_at)}</td>
+      <td class="td-id">${escapeHtml(m.id)}</td>
+    `;
+    tr.onclick = () => selectMilestone(m.id);
+    tr.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectMilestone(m.id); } };
+    tbody.appendChild(tr);
+  });
+}
+
+// =========================================================
+// MILESTONE DETAIL
+// =========================================================
+async function selectMilestone(id) {
+  selectedId = id;
+
+  // Update ledger highlight
+  document.querySelectorAll('#ledger-tbody tr').forEach(tr => {
+    tr.style.background = tr.querySelector('.td-id')?.textContent === id ? 'var(--primary-bg)' : '';
+  });
+
+  $('detail-placeholder').style.display = 'none';
+  $('detail-content').style.display = 'block';
+  $('detail-content').innerHTML = `<div class="loading-state"><div class="spinner"></div> Loading milestone…</div>`;
+
+  try {
+    const m = await api('GET', `/milestones/${id}`);
+    renderDetail(m);
+  } catch (err) {
+    $('detail-content').innerHTML = `
+      <div class="empty-state">
+        <span style="color:#DC2626;font-size:.875rem">Failed to load: ${escapeHtml(err.message)}</span>
+      </div>`;
+  }
+}
+
+function renderDetail(m) {
+  const content = $('detail-content');
+  content.innerHTML = '';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.style.paddingBottom = '16px';
+  header.innerHTML = `
+    <div style="flex:1;min-width:0">
+      <div class="card-title" style="margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(m.title)}">${escapeHtml(m.title)}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${badgeHtml(m.status)}
+        <span class="text-muted text-sm" style="font-variant-numeric:tabular-nums">${fmtAmount(m.amount, m.currency)}</span>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="selectMilestone('${escapeHtml(m.id)}')" aria-label="Refresh milestone detail">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M4 12a8 8 0 018-8 8 8 0 015.66 2.34L20 4v6h-6l2.34-2.34A6 6 0 1018 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  `;
+  content.appendChild(header);
+
+  // Warning if no PayPal
+  if (!m.authorization_id || m.authorization_id === 'DEMO_AUTH_ID') {
+    if (m.status === 'PENDING_FUNDING') {
+      const banner = document.createElement('div');
+      banner.style.padding = '0 24px 8px';
+      banner.innerHTML = `
+        <div class="approve-banner" role="alert">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="#D97706" stroke-width="2"/><path d="M12 7v5l3 3" stroke="#D97706" stroke-width="2" stroke-linecap="round"/></svg>
+          <div>
+            <strong>Awaiting payment</strong> — 
+            <a href="${escapeHtml(m.approve_url || '#')}" target="_blank" class="inline-link" style="color:#92400E">Approve on PayPal</a>
+            ${!m.approve_url?.includes('DEMO') ? '' : ' (demo mode — no real payment)'}
+          </div>
+        </div>`;
+      content.appendChild(banner);
+    }
+  }
+
+  // Stepper
+  content.appendChild(buildStepper(m));
+
+  // Divider
+  const div1 = document.createElement('hr');
+  div1.className = 'card-divider';
+  content.appendChild(div1);
+
+  // AI Verdict card (if exists)
+  if (m.ai_result) {
+    content.appendChild(buildVerdictCard(m.ai_result));
+    const div2 = document.createElement('hr');
+    div2.className = 'card-divider';
+    content.appendChild(div2);
+  }
+
+  // Decide buttons (NEEDS_REVIEW)
+  if (m.status === 'NEEDS_REVIEW') {
+    content.appendChild(buildDecideSection(m));
+    const div3 = document.createElement('hr');
+    div3.className = 'card-divider';
+    content.appendChild(div3);
+  }
+
+  // Proof form (HELD or PENDING demo)
+  if (m.status === 'HELD' || (m.status === 'PENDING_FUNDING' && m.authorization_id === 'DEMO_AUTH_ID')) {
+    content.appendChild(buildProofForm(m));
+  } else if (!m.ai_result && m.status !== 'PENDING_FUNDING') {
+    // settled, no proof form
+  } else if (!m.ai_result) {
+    content.appendChild(buildProofForm(m));
+  }
+
+  // Update mock badge
+  if (m.ai_result?.mock) {
+    $('mock-badge').style.display = 'inline-flex';
+    mockAIEnabled = true;
+  }
+}
+
+// =========================================================
+// STEPPER
+// =========================================================
+function buildStepper(m) {
+  const steps = [
+    { label: 'Funded', status: 'PENDING_FUNDING' },
+    { label: 'Proof submitted', status: null },
+    { label: 'AI check', status: null },
+    { label: 'Settled', status: null },
+  ];
+
+  const stepIdx = {
+    PENDING_FUNDING: 0,
+    HELD: 1,
+    NEEDS_REVIEW: 2,
+    RELEASED: 3,
+    VOIDED: 3,
+  }[m.status] ?? 0;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'stepper';
+  wrap.setAttribute('aria-label', 'Milestone lifecycle steps');
+
+  steps.forEach((step, i) => {
+    if (i > 0) {
+      const connector = document.createElement('div');
+      connector.className = 'step-connector' + (i <= stepIdx ? ' done' : '');
+      wrap.appendChild(connector);
+    }
+
+    const stepEl = document.createElement('div');
+    const cls = i < stepIdx ? 'done' : i === stepIdx ? 'active' : '';
+    stepEl.className = `step ${cls}`;
+    stepEl.setAttribute('aria-current', i === stepIdx ? 'step' : 'false');
+
+    const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+    stepEl.innerHTML = `
+      <div class="step-circle">${i < stepIdx ? checkSvg : i + 1}</div>
+      <div class="step-label">${step.label}${i === stepIdx && m.status === 'VOIDED' && i === 3 ? ' (Refunded)' : ''}</div>
+    `;
+    wrap.appendChild(stepEl);
+  });
+
+  return wrap;
+}
+
+// =========================================================
+// VERDICT CARD
+// =========================================================
+function buildVerdictCard(ai) {
+  const wrap = document.createElement('div');
+  wrap.className = 'verdict-card';
+
+  const verdictClass = `verdict-${ai.verdict}`;
+  const verdictLabel = { pass: '✓ Passed', fail: '✗ Failed', unclear: '? Unclear' }[ai.verdict] || ai.verdict;
+  const pct = Math.round((ai.confidence || 0) * 100);
+
+  let html = `
+    <div class="verdict-header">
+      <span class="card-title">AI Verification</span>
+      <span class="badge ${verdictClass}" role="status" aria-label="Verdict: ${verdictLabel}">${verdictLabel}</span>
+      ${ai.mock ? '<span class="mock-label" title="Gemini unavailable; using keyword-based mock">demo fallback</span>' : ''}
+    </div>
+
+    <div class="confidence-bar-wrap" role="meter" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Confidence: ${pct}%">
+      <div class="confidence-label">
+        <span>Confidence</span><span>${pct}%</span>
+      </div>
+      <div class="confidence-bar-track">
+        <div class="confidence-bar-fill" style="width:${pct}%"></div>
+      </div>
+    </div>
+  `;
+
+  if (ai.reasons?.length) {
+    html += `<ul class="reasons-list" aria-label="Reasons">`;
+    ai.reasons.forEach(r => {
+      html += `<li>
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0;margin-top:1px;color:var(--muted)">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 7v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="16" r="1" fill="currentColor"/>
+        </svg>
+        <span>${escapeHtml(r)}</span>
+      </li>`;
+    });
+    html += `</ul>`;
+  }
+
+  if (ai.criteria_checks?.length) {
+    html += `<div class="section-label" style="margin-bottom:8px">Criteria checks</div><div class="criteria-list" role="list">`;
+    ai.criteria_checks.forEach(c => {
+      const icon = c.met
+        ? `<svg class="criterion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-label="Met" style="color:#059669"><circle cx="12" cy="12" r="10" fill="#ECFDF5"/><path d="M8 12l3 3 5-5" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+        : `<svg class="criterion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-label="Not met" style="color:#DC2626"><circle cx="12" cy="12" r="10" fill="#FEF2F2"/><path d="M9 9l6 6M15 9l-6 6" stroke="#DC2626" stroke-width="2" stroke-linecap="round"/></svg>`;
+      html += `<div class="criterion-item" role="listitem">
+        ${icon}
+        <div class="criterion-text">
+          <div class="criterion-name">${escapeHtml(c.criterion)}</div>
+          <div class="criterion-evidence">${escapeHtml(c.evidence || '')}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  wrap.innerHTML = html;
+  return wrap;
+}
+
+// =========================================================
+// DECIDE SECTION
+// =========================================================
+function buildDecideSection(m) {
+  const wrap = document.createElement('div');
+  wrap.className = 'decide-section';
+  wrap.innerHTML = `
+    <div class="decide-title">Manual Decision Required</div>
+    <p class="text-muted text-sm" style="margin-bottom:12px">
+      AI confidence was insufficient for automatic settlement. Review the evidence above and decide.
+    </p>
+    <div class="decide-btns">
+      <button class="btn btn-success" id="btn-release" onclick="handleDecide('${escapeHtml(m.id)}', 'release')">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Release to freelancer
+      </button>
+      <button class="btn btn-danger" id="btn-refund" onclick="handleDecide('${escapeHtml(m.id)}', 'refund')">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Refund to payer
+      </button>
+    </div>
+  `;
+  return wrap;
+}
+
+async function handleDecide(id, action) {
+  const btnId = action === 'release' ? 'btn-release' : 'btn-refund';
+  const btn = $(btnId);
+  if (!btn) return;
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = `<div class="spinner"></div> Processing…`;
+
+  try {
+    const result = await api('POST', `/milestones/${id}/decide`, { action });
+    toast(`Milestone ${action === 'release' ? 'released ✓' : 'refunded ✓'}. Status: ${result.status}`, 'success');
+    await loadLedger();
+    selectMilestone(id);
+  } catch (err) {
+    toast(`Failed: ${err.message}`, 'error');
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+// =========================================================
+// PROOF FORM
+// =========================================================
+function buildProofForm(m) {
+  const wrap = document.createElement('div');
+  wrap.className = 'proof-section';
+
+  wrap.innerHTML = `
+    <div class="proof-title">Submit Proof</div>
+    <form id="proof-form" class="form-gap" onsubmit="handleProof(event,'${escapeHtml(m.id)}')" novalidate>
+      <div class="field">
+        <label for="p-text">Description / evidence text</label>
+        <textarea class="input" id="p-text" rows="4"
+          placeholder="Describe what was delivered. Include links, commit hashes, invoice numbers, etc."
+          maxlength="10000"></textarea>
+      </div>
+      <div class="field">
+        <label for="p-link">Link (optional)</label>
+        <input class="input" id="p-link" type="url"
+          placeholder="https://github.com/…" maxlength="500" />
+      </div>
+      <div class="field">
+        <label>File attachment (optional — image or PDF, max 10 MB)</label>
+        <div class="file-drop" id="file-drop-zone" role="button" aria-label="Upload proof file">
+          <input type="file" id="p-file" accept="image/*,application/pdf"
+            onchange="handleFileChange(this)" aria-label="Choose proof file" />
+          <div class="file-drop-label" id="file-label">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" aria-hidden="true" style="margin:0 auto 4px;display:block;color:var(--muted)">
+              <path d="M4 16l4-4 4 4 4-8 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 20h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Drop file here or <strong style="color:var(--primary)">browse</strong>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" type="submit" id="proof-btn" style="flex:1">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v13M5 9l7 7 7-7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Submit for AI verification
+        </button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="loadDemoProofs('${escapeHtml(m.id)}')" title="Load 3 sample proofs and run verification">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3A6.5 6.5 0 0116 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 019.5 16 6.5 6.5 0 013 9.5 6.5 6.5 0 019.5 3z" fill="currentColor" opacity=".2"/><circle cx="9.5" cy="9.5" r="6.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          Demo
+        </button>
+      </div>
+    </form>
+  `;
+
+  // Drag & drop
+  setTimeout(() => {
+    const zone = $('file-drop-zone');
+    if (!zone) return;
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag');
+      const f = e.dataTransfer.files[0];
+      if (f) {
+        const input = $('p-file');
+        // Create a DataTransfer to set the file
+        const dt = new DataTransfer();
+        dt.items.add(f);
+        input.files = dt.files;
+        handleFileChange(input);
+      }
+    });
+  }, 0);
+
+  return wrap;
+}
+
+function handleFileChange(input) {
+  const label = $('file-label');
+  if (!label) return;
+  if (input.files && input.files[0]) {
+    const f = input.files[0];
+    const sizeMB = (f.size / 1024 / 1024).toFixed(1);
+    label.innerHTML = `<span class="file-name">📎 ${escapeHtml(f.name)}</span> <span class="text-muted" style="font-size:.75rem">${sizeMB} MB</span>`;
+  } else {
+    label.innerHTML = `Drop file here or <strong style="color:var(--primary)">browse</strong>`;
+  }
+}
+
+async function handleProof(e, id) {
+  e.preventDefault();
+  const btn = $('proof-btn');
+  if (!btn) return;
+
+  const text = $('p-text')?.value?.trim() || '';
+  const link = $('p-link')?.value?.trim() || '';
+  const fileInput = $('p-file');
+  const file = fileInput?.files?.[0];
+
+  if (!text && !link && !file) {
+    toast('Provide at least one piece of evidence: text, link, or file.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner"></div> AI is checking…`;
+
+  try {
+    const fd = new FormData();
+    if (text) fd.append('text', text);
+    if (link) fd.append('link', link);
+    if (file) fd.append('file', file);
+
+    const result = await api('POST', `/milestones/${id}/proof`, fd, true);
+
+    const verdictLabel = { pass: 'Passed ✓', fail: 'Failed ✗', unclear: 'Unclear — needs review' }[result.verdict] || result.verdict;
+    const verdictType = result.verdict === 'pass' ? 'success' : result.verdict === 'fail' ? 'error' : 'info';
+    toast(`AI verdict: ${verdictLabel}. Status → ${result.status}`, verdictType, 7000);
+
+    if (result.paypal_warning) {
+      toast(`⚠ ${result.paypal_warning}`, 'error', 10000);
+    }
+
+    await loadLedger();
+    selectMilestone(id);
+  } catch (err) {
+    toast(`Proof submission failed: ${err.message}`, 'error');
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 2v13M5 9l7 7 7-7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Submit for AI verification`;
+  }
+}
+
+// =========================================================
+// DEMO PROOFS
+// =========================================================
+async function loadDemoProofs(id) {
+  const proofTypes = ['pass', 'fail', 'unclear'];
+  toast(`Running 3 demo proofs (pass / fail / unclear) in sequence…`, 'info', 4000);
+
+  for (let i = 0; i < proofTypes.length; i++) {
+    const type = proofTypes[i];
+    const proof = DEMO_PROOFS[type];
+
+    // We need a fresh milestone in HELD state for each demo — but we only have one milestone.
+    // So we run them sequentially and show results, but only the first will actually change state.
+    // A better UX: run the first one, show result, then inform user to create new milestones for others.
+    if (i === 0) {
+      // Fill the form with demo data and auto-submit
+      if ($('p-text')) $('p-text').value = proof.text;
+      if ($('p-link')) $('p-link').value = proof.link;
+      await handleProof({ preventDefault: () => {} }, id);
+      break; // Only auto-submit the first; the user can try others manually
+    }
+  }
+
+  // Show all three proofs so user can manually test
+  toast(`Demo proofs loaded. Try the other variants: fail = "not done, incomplete"; unclear = "some work done".`, 'info', 10000);
+}
+
+// =========================================================
+// HEALTH CHECK & INIT
+// =========================================================
+async function init() {
+  // Check health
+  try {
+    const h = await fetch('/api/health').then(r => r.json());
+    if (h.mock_ai) {
+      $('mock-badge').style.display = 'inline-flex';
+      mockAIEnabled = true;
+    }
+    if (!h.paypal_configured) {
+      toast('PayPal not configured — running in demo mode. Set PAYPAL_CLIENT_ID and PAYPAL_SECRET to enable real payments.', 'info', 10000);
+    }
+  } catch {}
+
+  await loadLedger();
+}
+
+init();
+</script>
+</body>
+</html>
